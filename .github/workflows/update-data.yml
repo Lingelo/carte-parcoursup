@@ -1,0 +1,70 @@
+name: Update Parcoursup Data
+
+on:
+  schedule:
+    # June 15th at 8am UTC — Parcoursup data typically published in June
+    - cron: '0 8 15 6 *'
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch latest Parcoursup data (auto-detects session)
+        run: node scripts/fetch-data.mjs
+
+      - name: Check for data changes
+        id: check
+        run: |
+          if git diff --quiet public/data/formations.json 2>/dev/null; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No data changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Data has changed!"
+          fi
+
+      - name: Commit updated data
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/formations.json
+          SESSION=$(node -e "const d=require('./public/data/formations.json'); console.log(d.meta.session)")
+          git commit -m "chore: update Parcoursup data (session ${SESSION})"
+          git push
+
+      - name: Build
+        if: steps.check.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Upload artifact
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4
