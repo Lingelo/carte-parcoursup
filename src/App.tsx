@@ -2,12 +2,14 @@ import { useState, useCallback, useMemo } from 'react';
 import type { LatLngBounds } from 'leaflet';
 import type { Formation } from './types';
 import { useFormations } from './hooks/useFormations';
+import { timeAgo } from './utils/format';
 import { MapView } from './components/MapView';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { Filters } from './components/Filters';
 import { FormationPanel } from './components/FormationPanel';
 import { FormationDetail } from './components/FormationDetail';
+import { AboutModal } from './components/AboutModal';
 
 export default function App() {
   const {
@@ -25,6 +27,7 @@ export default function App() {
   const [selectedFormation, setSelectedFormation] = useState<Formation | null>(null);
   const [hoveredFormation, setHoveredFormation] = useState<Formation | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   // Formations with valid geolocation
   const geoFormations = useMemo(
@@ -123,8 +126,18 @@ export default function App() {
             <span>Session {meta.session}</span>
             <span className="text-gray-300">|</span>
             <span>{meta.total.toLocaleString('fr-FR')} formations</span>
+            {meta.generatedAt && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span>{timeAgo(meta.generatedAt)}</span>
+              </>
+            )}
           </>
         )}
+        <span className="text-gray-300">|</span>
+        <button onClick={() => setShowAbout(true)} className="underline hover:text-gray-700">
+          A propos
+        </button>
       </div>
 
       {/* Desktop sidebar */}
@@ -175,6 +188,10 @@ export default function App() {
           formation={selectedFormation}
           onClose={() => setSelectedFormation(null)}
         />
+      )}
+
+      {showAbout && (
+        <AboutModal onClose={() => setShowAbout(false)} lastUpdate={meta?.generatedAt} />
       )}
     </div>
   );
